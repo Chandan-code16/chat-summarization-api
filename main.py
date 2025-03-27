@@ -1,4 +1,5 @@
 import os
+import uvicorn
 from fastapi import FastAPI, HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
@@ -6,6 +7,10 @@ import openai
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import List
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))  # Use Railway's assigned PORT
+    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=True)
 
 # Load environment variables
 load_dotenv()
