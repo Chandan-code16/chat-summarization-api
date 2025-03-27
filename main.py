@@ -8,16 +8,6 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import List
 
-app = FastAPI()
-
-@app.get("/")
-def read_root():
-    return {"message": "API is running"}
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))  # Use Railway's assigned PORT
-    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=True)
-
 # Load environment variables
 load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
