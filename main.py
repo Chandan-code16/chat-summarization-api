@@ -13,8 +13,9 @@ load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Initialize OpenAI API
-openai.api_key = OPENAI_API_KEY
+# Validate API Keys
+if not MONGO_URI or not OPENAI_API_KEY:
+    raise RuntimeError("MONGO_URI and OPENAI_API_KEY must be set in .env file")
 
 # Initialize FastAPI
 app = FastAPI()
@@ -24,12 +25,15 @@ client = AsyncIOMotorClient(MONGO_URI)
 db = client["chat_database"]
 collection = db["chats"]
 
+# Ensure MongoDB connection closes on shutdown
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    client.close()
 
 # Pydantic model
 class ChatMessage(BaseModel):
     user_id: str
     message: str
-
 
 @app.post("/chats")
 async def store_chat(chat: ChatMessage):
@@ -37,7 +41,6 @@ async def store_chat(chat: ChatMessage):
     chat_data = {"user_id": chat.user_id, "message": chat.message}
     result = await collection.insert_one(chat_data)
     return {"message": "Chat stored", "chat_id": str(result.inserted_id)}
-
 
 @app.get("/chats/{conversation_id}")
 async def get_chat(conversation_id: str):
@@ -48,13 +51,12 @@ async def get_chat(conversation_id: str):
             raise HTTPException(status_code=404, detail="Chat not found")
         chat["_id"] = str(chat["_id"])
         return chat
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid conversation ID")
 
-
+# Request model for summarization
 class ChatSummaryRequest(BaseModel):
     user_id: str
-
 
 @app.post("/chats/summarize")
 async def summarize_chat(request: ChatSummaryRequest):
@@ -69,16 +71,14 @@ async def summarize_chat(request: ChatSummaryRequest):
     prompt = "Summarize this conversation:\n" + "\n".join(messages)
 
     try:
-        client = openai.OpenAI()  # ✅ New OpenAI Client
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}]
         )
-        summary = response.choices[0].message.content  # ✅ Updated access to response
+        summary = response["choices"][0]["message"]["content"]
         return {"user_id": request.user_id, "summary": summary}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.delete("/chats/{conversation_id}")
 async def delete_chat(conversation_id: str):
@@ -88,5 +88,8 @@ async def delete_chat(conversation_id: str):
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Chat not found")
         return {"message": "Chat deleted successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid conversation ID")
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
