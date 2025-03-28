@@ -91,5 +91,7 @@ async def delete_chat(conversation_id: str):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid conversation ID")
 
+PORT = int(os.getenv("PORT", 8000))  # Default to 8000 if not set
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=PORT)
+
